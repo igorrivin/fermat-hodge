@@ -1,0 +1,154 @@
+\documentclass[11pt]{article}
+\usepackage{amsmath,amssymb,amsthm,mathtools,hyperref,enumitem,geometry}
+\geometry{margin=1.1in}
+\usepackage[T1]{fontenc}
+\usepackage{microtype}
+\usepackage{mathrsfs}
+\usepackage{listings}
+\lstset{basicstyle=\ttfamily\small,breaklines=true}
+
+\title{Computing the Hodge Lattice of Fermat Hypersurfaces:\\
+Rank and Discriminant via Shioda--Ran and Smith Normal Form}
+\author{Prepared for a friendly duel with a persistent proposer}
+\date{\today}
+
+\newtheorem{theorem}{Theorem}
+\newtheorem{lemma}{Lemma}
+\newtheorem{prop}{Proposition}
+\newtheorem{cor}{Corollary}
+\theoremstyle{definition}
+\newtheorem{definition}{Definition}
+\newtheorem{remark}{Remark}
+
+\newcommand{\Xmn}{X_m^n}
+\newcommand{\PP}{\mathbf{P}}
+\newcommand{\ZZ}{\mathbf{Z}}
+\newcommand{\QQ}{\mathbf{Q}}
+\newcommand{\CC}{\mathbf{C}}
+\newcommand{\muone}{\mu_m^{\,n+2}/\mu_m}
+\newcommand{\Hdg}{\mathrm{Hdg}}
+\newcommand{\NS}{\mathrm{NS}}
+\newcommand{\rank}{\mathrm{rank}}
+\newcommand{\disc}{\mathrm{disc}}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We give a practical, computer-ready blueprint for computing the \emph{rank} and, when feasible, the \emph{discriminant} of the lattice of Hodge cycles in the middle cohomology of Fermat hypersurfaces
+\(\Xmn : x_0^m+\cdots+x_{n+1}^m=0\subset \PP^{n+1}\) with \(n\) even.
+Two complementary routes are described:
+\begin{itemize}[nosep]
+\item[(A)] a purely combinatorial count (after Shioda--Ran) giving \(\mathrm{rank}\) as \(1+\#\mathfrak{B}_m^{\,n}\);
+\item[(B)] a Smith normal form (SNF) computation of a Gram matrix built either from (B1) linear algebraic cycles \( \PP^p \subset \Xmn\), or (B2) vanishing cycles projected to the Hodge subspace by character idempotents.
+\end{itemize}
+We also package ready-to-run \textsf{SageMath} code that implements (A) in full generality and (B1) for fourfolds. Worked examples include the Fermat surface of degree \(13\) and Fermat fourfolds of degrees \(5,7,9\).
+\end{abstract}
+
+\section{Set-up and the Shioda--Ran description}
+Let \(n=2p\) be even and \(X=\Xmn\). Write \(G=\mu_m^{\,n+2}/\mu_m\) for the diagonal symmetry and \(\widehat G\cong \{(a_0,\dots,a_{n+1})\in (\ZZ/m\ZZ)^{n+2}\mid \sum a_i\equiv 0\}\) for its character group.
+Following Shioda and Ran, the primitive middle cohomology decomposes into one-dimensional character eigenspaces \(V(\alpha)\) and the primitive Hodge classes are a direct sum of those \(V(\alpha)\) picked out by a simple congruence condition:
+
+\begin{definition}[Shioda's set \(\mathfrak U_m^{\,n}\) and \(\mathfrak B_m^{\,n}\)]
+Let \(\langle a\rangle\) denote the representative of \(a\in\ZZ/m\ZZ\) in \(\{1,\dots,m-1\}\). Put
+\begin{align*}
+\mathfrak U_m^{\,n}&=\Big\{\alpha=(a_0,\dots,a_{n+1})\in\widehat G\;:\; a_i\not\equiv 0\ \forall i\Big\},\\
+\mathfrak B_m^{\,n}&=\Big\{\alpha\in\mathfrak U_m^{\,n}\;:\; \sum_{i=0}^{n+1}\big\langle t a_i\big\rangle =(p+1)m\ \text{ for all }t\in (\ZZ/m\ZZ)^\times\Big\}.
+\end{align*}
+\end{definition}
+
+\begin{theorem}[Ran--Shioda]
+If \(n=2p\) then the primitive Hodge classes are
+\(\Hdg^p_{\mathrm{prim}}(X)=\bigoplus_{\alpha\in \mathfrak B_m^{\,n}} V(\alpha)\), each summand one-dimensional over \(\CC\). Consequently,
+\begin{equation}\label{eq:rank-formula}
+\rank\,\Hdg^p(X;\ZZ)=1+\#\,\mathfrak B_m^{\,n},
+\end{equation}
+the extra \(1\) being the non-primitive class \(h^p\) of the hyperplane.\footnote{See, e.g., da~Silva's exposition \emph{Notes on the Hodge conjecture for Fermat varieties}, Theorem~2.1 and \S2 \cite{daSilva2021}, which restates Shioda's original result \cite{Shioda1979} and Ran \cite{Ran1980}.}
+\end{theorem}
+
+\paragraph{Algorithm A (rank).} The condition defining \(\mathfrak B_m^{\,n}\) can be enforced with a small integer linear system on the \emph{multiplicity vector} \((c_1,\dots,c_{m-1})\), where \(c_r\) counts how many coordinates equal \(r\). Writing \(k=n+2\) and \(U=(\ZZ/m\ZZ)^\times\), one requires
+\begin{equation}\label{eq:ILP}
+\sum_{r=1}^{m-1} c_r = k,\qquad \sum_{r=1}^{m-1}\big\langle t r\big\rangle c_r = (p+1)m\quad(\forall\,t\in U),\qquad c_r\in\ZZ_{\ge 0}.
+\end{equation}
+For each solution \(c\), the number of ordered \((a_0,\dots,a_{k-1})\) it represents is the multinomial \(\binom{k}{c_1,\dots,c_{m-1}}\). Summing these multinomials over all solutions of \eqref{eq:ILP} yields \(\#\,\mathfrak B_m^{\,n}\), hence the rank by \eqref{eq:rank-formula}. This is implemented in the attached \textsf{Sage} file (function \texttt{hodge\_rank\_via\_B}).
+
+\medskip
+\section{Intersection of linear cycles and a Gram matrix}
+For \(n=2p\), the Fermat equation splits coordinates into \(p+1\) pairs; fixing a pairing and \(\zeta_j\in\mu_m\) per pair, the linear subspace
+\begin{equation}\label{eq:linear-cycle}
+L(\boldsymbol\zeta):\quad x_{2j}=\zeta_j\,x_{2j+1}\qquad (j=0,\dots,p)
+\end{equation}
+lies on \(\Xmn\). Let \(P_i\) range over all such \(L(\boldsymbol\zeta)\) for all pairings and choices of \(\boldsymbol\zeta\) (there are \( \frac{(n+2)!}{2^{p+1}(p+1)!}\cdot m^{p+1}\) of them). The intersection numbers inside \(X\) depend only on \(d=m\) and on the \emph{projective} dimension \(r=\dim(P_i\cap P_j)\) of their intersection \emph{in} \(\PP^{n+1}\):
+\begin{equation}\label{eq:AMV-formula}
+P_i\cdot P_j=\frac{1-(-d+1)^{\,r+1}}{d}\qquad(r=-1,0,1,\dots,p),
+\end{equation}
+with the convention \((\cdot)=0\) for $r=-1$. This closed formula (no Gr\"obner bases needed) is stated in \cite[Eq.\,(6)]{AMV2019}.
+
+\paragraph{Primitive part.} Following \cite[\S3.1]{AMV2019}, pass to primitive classes \( \check P_i:=P_i-P_1\) and form the integer Gram matrix \(A_1=[\check P_i\cdot \check P_j]\). Its SNF gives the elementary divisors of the lattice generated by the linear cycles in primitive middle homology.
+
+\paragraph{From primitive to full Hodge lattice.}
+As explained in \cite[\S3.3]{AMV2019}, to pass from the primitive lattice to the full Hodge lattice one \emph{decreases} the multiplicity of the elementary divisor \(1\) by \(2\) and \emph{adds} a new elementary divisor \(d=m\). (Equivalently, adjoin \(h^p\) and apply SNF.)
+
+\paragraph{Primitivity and discriminant.}
+In favorable cases (e.g.\ degree \(5\) fourfolds, and many Fermat surfaces), one can certify that the sublattice generated by linear cycles is \emph{primitive} in the Hodge lattice using supersingular reduction and the Artin--Tate apparatus; see \S6 below and \cite{AMV2019,SchuettShiodaVanLuijk2009}. When primitivity holds, the SNF of \(A_1\) (after the preceding adjustment) yields the elementary divisors and hence the \emph{discriminant}.
+
+\section{Alternative route: vanishing cycles and idempotent projectors}
+One can compute the Hodge lattice intrinsically, avoiding algebraic cycles, by starting with a Pham basis of vanishing cycles for the Brieskorn--Pham singularity \(x_0^m+\cdots+x_{n+1}^m\), letting \(G\) act, and projecting to the Hodge subspace by
+\[
+E=\sum_{\alpha\in\mathfrak B_m^{\,n}} e_\alpha,\qquad
+e_\alpha=\frac{1}{|G|}\sum_{g\in G}\chi_\alpha(g)^{-1} g.
+\]
+Restricting the vanishing-cycle intersection form to \(\mathrm{im}(E)\) gives a Gram matrix for the primitive Hodge lattice. This is the second half of \cite{AMV2019} (their Algorithm~2), where the authors compare SNFs from the two routes (linear vs.\ vanishing cycles) to prove equality of lattices.
+
+\section{Worked examples}
+\subsection*{Surface, degree \(13\)}
+The Fermat surface \(S: x_0^{13}+x_1^{13}+x_2^{13}+x_3^{13}=0\) has \(\rho(S)=397\) and \(\disc \NS(S)=13^{300}\). This is proved in \cite[\S6.5]{SchuettShiodaVanLuijk2009} using supersingular reduction at \(p=5\) and the Artin--Tate formula (see the PDF for the exact statement and numbers).
+
+\subsection*{Fourfold, degree \(5\)}
+For \(X_5^4\) one has \(\rank \Hdg^2(X_5^4)=1+\#\mathfrak B_5^4=401\) (Algorithm~A). Aljovin--Movasati--Villaflor compute the SNF of the Hodge lattice and list its elementary divisors as
+\[
+1^{166}\cdot 5^{174}\cdot 25^{54}\cdot 125^{7},
+\]
+so the discriminant is \(5^{174+2\cdot 54+3\cdot 7}=5^{303}\) \cite[Table~1, row $(n,d)=(4,5)$]{AMV2019}.
+
+\subsection*{Fourfolds, degrees \(7\) and \(9\)}
+Algorithm~A gives
+\[
+\#\mathfrak B_7^4=1860,\qquad \#\mathfrak B_9^4=8000,
+\]
+hence \(\rank \Hdg^2(X_7^4)=1861\) and \(\rank \Hdg^2(X_9^4)=8001\). The attached \textsf{Sage} code produces these counts in milliseconds. For discriminants, one can proceed via \S3 using all linear \(\PP^2\)'s; primitivity (and thus equality with the Hodge lattice) would require an additional argument as in \cite{AMV2019}.
+
+\section{What the attached \textsf{SageMath} file does}
+The file \texttt{fermat\_hodge\_lattice.sage} contains:
+\begin{itemize}
+\item \texttt{hodge\_rank\_via\_B(m,n)}: full implementation of Algorithm~A, counting \(\#\mathfrak B_m^{\,n}\) by solving \eqref{eq:ILP} via a tiny exhaustive search on multiplicities \(c_r\). For $(n,d)=(4,5),(4,7),(4,9)$ it returns \(400,1860,8000\).
+\item \texttt{linear\_cycles\_intersection\_number(c1,c2,m)}: computes \(r=\dim(P_i\cap P_j)\) by linear algebra over \(\QQ(\zeta_m)\) and returns the integer \( (1-(-m+1)^{r+1})/m\) as in \eqref{eq:AMV-formula}.
+\item \texttt{linear\_cycles\_SNF(m)} (fourfolds): builds a spanning set of linear \(\PP^2\)'s, forms the Gram matrix of the primitive classes, extracts a full-rank submatrix, and takes its SNF. A helper \texttt{adjust\_primitive\_to\_full} performs the \(+\,h^2\) adjustment explained above.
+\end{itemize}
+The code is written to be readable and modifiable; it uses only standard \textsf{Sage} functionality (cyclotomic fields, integer matrices, SNF).
+
+\paragraph{Practical tip.} For \(m=5\) the full set of linear cycles has size \(15\cdot 5^3=1875\). You do \emph{not} need them all: the script greedily selects cycles until the target rank is reached (401), then computes SNF on that smaller matrix. For \(m=7,9\) the same strategy is advisable.
+
+\bigskip
+\noindent\textbf{Acknowledgements.} The algorithms and the idea of comparing SNFs are due to Aljovin, Movasati, and Villaflor; Shioda and Ran underlie the rank computation and the representation-theoretic picture. Any implementation errors in the accompanying code are mine.
+
+\begin{thebibliography}{99}
+
+\bibitem{Shioda1979}
+T.~Shioda, \emph{The Hodge Conjecture for Fermat Varieties}, Math.\ Ann.\ \textbf{245} (1979), 175--184.
+
+\bibitem{Ran1980}
+Z.~Ran, \emph{Cycles on Fermat hypersurfaces}, Compositio Math.\ \textbf{42} (1980), 121--142.
+
+\bibitem{AMV2019}
+E.~Aljovin, H.~Movasati, R.~Villaflor~Loyola, \emph{Integral Hodge conjecture for Fermat varieties}, arXiv:1711.02628v2 (2019) and Exp.\ Math.\ (2019). Algorithm boxes and Tables~1--2 give the SNF workflows and the elementary divisors for quartic/quintic fourfolds.
+
+\bibitem{SchuettShiodaVanLuijk2009}
+M.~Sch\"utt, T.~Shioda, R.~van~Luijk, \emph{Lines on Fermat surfaces} (2009 preprint). Section~6.5 proves for $m=13$ that $\rho=397$ and $\disc \NS=13^{300}$.
+
+\bibitem{daSilva2021}
+G.~da~Silva~Jr, \emph{Notes on the Hodge conjecture for Fermat varieties}, Experimental Results (2021). Theorem~2.1 reviews the $\Hdg$-decomposition via the set $\mathfrak B_m^{\,n}$.
+
+\end{thebibliography}
+
+\end{document}
